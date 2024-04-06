@@ -1,0 +1,1 @@
+/usr/bin/clang++-17 -Wall -fpermissive -O3 -fopenmp -O2 -g CMakeFiles/loader.dir/app/loader.cpp.o -o ../bin/loader  ../lib/libbasic_socket.a -lpthread 

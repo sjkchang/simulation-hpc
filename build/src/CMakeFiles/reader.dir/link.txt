@@ -1,0 +1,1 @@
+/usr/bin/clang++-17 -Wall -fpermissive -O3 -fopenmp -O2 -g CMakeFiles/reader.dir/app/reader.cpp.o -o ../bin/reader  ../lib/libbasic_socket.a -lpthread 

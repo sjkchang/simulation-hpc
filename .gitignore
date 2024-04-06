@@ -1,2 +1,2 @@
-parkingviolations-2022.tar.gz
-parser/data/parkingviolations/Parking_Violations_Issued_-_Fiscal_Year_2022.csv
+*.csv
+*.tar.gz

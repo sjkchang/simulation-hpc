@@ -1,14 +1,17 @@
 cmake_minimum_required(VERSION 3.22)
 
-project (threading)
+project (simulator)
 
 # general flags (consider -Wextra)
 SET(CMAKE_CXX_FLAGS "-Wall -fpermissive")
 
+# c/c++ standard if not using the default
+set(CMAKE_CXX_STANDARD 20)
+
 # OpenMP threading
 #SET(OPENMP_CXX_FLAGS "-O3 -fopenmp --target=x86_64-pc-linux-gnu")
 SET(OPENMP_CXX_FLAGS "-O3 -fopenmp")
-SET( CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} ${OPENMP_CXX_FLAGS}" )
+SET(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} ${OPENMP_CXX_FLAGS}" )
 
 # c/c++ standard if not using the default
 set(CMAKE_CXX_STANDARD 20)
@@ -17,9 +20,9 @@ if (CMAKE_COMPILER_IS_GNUCC AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 12.0)
    # for intel systems add -fsanitize=address. Note this is not supported
    # on apple's aarch64 under gcc. Maybe with clang/xcode. Also, consider 
    # -fsanitize-address-use-after-scope
-   #SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2")
+    #SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2")
 
-elseif (CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 16.0)
+elseif ((CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID MATCHES "Clang-17") AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 16.0)
    # matches clang and apple/clang
    
    # Four options exist - (un)comment as desired. Only one at a time
@@ -29,8 +32,9 @@ elseif (CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND CMAKE_CXX_COMPILER_VERSION VER
    # 4. run clang's linter, clang-tidy
 
    # Opt 1: build binaries
-   #SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2")
-
+   SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -std=c++11")
+   SET(CMAKE_C_COMPILER mpicc) 
+   SET(CMAKE_CXX_COMPILER mpicxx) 
    # Opt 2: static analyzer
    #SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g --analyze -Xanalyzer -analyzer-output=html -o report")
 

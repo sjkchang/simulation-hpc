@@ -1,0 +1,2 @@
+/usr/bin/llvm-ar-17 qc ../lib/libbasic_socket.a CMakeFiles/basic_socket.dir/app/main.cpp.o
+/usr/bin/llvm-ranlib-17 ../lib/libbasic_socket.a

@@ -1,0 +1,14 @@
+/home/sjkchang/classes/275/projects/simulation-code/build/CMakeFiles/edit_cache.dir
+/home/sjkchang/classes/275/projects/simulation-code/build/CMakeFiles/rebuild_cache.dir
+/home/sjkchang/classes/275/projects/simulation-code/build/CMakeFiles/list_install_components.dir
+/home/sjkchang/classes/275/projects/simulation-code/build/CMakeFiles/install.dir
+/home/sjkchang/classes/275/projects/simulation-code/build/CMakeFiles/install/local.dir
+/home/sjkchang/classes/275/projects/simulation-code/build/CMakeFiles/install/strip.dir
+/home/sjkchang/classes/275/projects/simulation-code/build/src/CMakeFiles/basic_socket.dir
+/home/sjkchang/classes/275/projects/simulation-code/build/src/CMakeFiles/main.dir
+/home/sjkchang/classes/275/projects/simulation-code/build/src/CMakeFiles/edit_cache.dir
+/home/sjkchang/classes/275/projects/simulation-code/build/src/CMakeFiles/rebuild_cache.dir
+/home/sjkchang/classes/275/projects/simulation-code/build/src/CMakeFiles/list_install_components.dir
+/home/sjkchang/classes/275/projects/simulation-code/build/src/CMakeFiles/install.dir
+/home/sjkchang/classes/275/projects/simulation-code/build/src/CMakeFiles/install/local.dir
+/home/sjkchang/classes/275/projects/simulation-code/build/src/CMakeFiles/install/strip.dir
