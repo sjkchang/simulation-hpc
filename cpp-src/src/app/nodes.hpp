@@ -137,28 +137,21 @@ public:
   }
 
   void distributeData() {
-    FileIterator fileIterator(base_dir, start_date, end_date);
-    std::vector<std::string> filePaths = fileIterator.getAllFileNames();
+    std::vector<std::string> fileNames =
+        loader.getFileNames(base_dir, start_date, end_date);
 
-    int filesPerWorker = filePaths.size() / (world_size - 1);
-    int remainingFiles = filePaths.size() % (world_size - 1);
-
-    for (int currentWorker = 1; currentWorker < world_size; ++currentWorker) {
-      int start_index = (currentWorker - 1) * filesPerWorker;
-      int end_index = start_index + filesPerWorker - 1;
-      if (currentWorker == world_size - 1) {
-        end_index += remainingFiles;
+    for (int i = 1; i < world_size; ++i) {
+      if (current_worker_rank >= fileNames.size()) {
+        break;
       }
 
+      std::string fileName = fileNames[current_worker_rank];
       char start_file[16];
-      strcpy(start_file, filePaths[start_index].c_str());
-      MPI_Send(&start_file, 16, MPI_CHAR, currentWorker, 0, MPI_COMM_WORLD);
+      strcpy(start_file, fileName.c_str());
+      MPI_Send(&start_file, 16, MPI_CHAR, i, 0, MPI_COMM_WORLD);
 
-      char end_file[16];
-      strcpy(end_file, filePaths[end_index].c_str());
-      MPI_Send(&end_file, 16, MPI_CHAR, currentWorker, 0, MPI_COMM_WORLD);
+      current_worker_rank++;
     }
-    numSent = filePaths.size() - 4;
   }
 
   void receiveData() {

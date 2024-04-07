@@ -1,0 +1,46 @@
+{
+    "records": [
+        {
+            "lat": "37.774900000000002",
+            "lon": "-122.4194",
+            "date": "2020-08-14T00:00:00",
+            "parameter": "PM2.5",
+            "concentration": "10",
+            "unit": "µg\/m³",
+            "rawConcentration": "10",
+            "aqi": "42",
+            "category": "1",
+            "siteName": "San Francisco",
+            "siteAgency": "EPA",
+            "siteId": "06-075-0006"
+        },
+        {
+            "lat": "37.774900000000002",
+            "lon": "-122.4194",
+            "date": "2020-08-14T00:00:00",
+            "parameter": "PM10",
+            "concentration": "20",
+            "unit": "µg\/m³",
+            "rawConcentration": "20",
+            "aqi": "42",
+            "category": "1",
+            "siteName": "an Francisco",
+            "siteAgency": "EPA",
+            "siteId": "06-075-0006"
+        },
+        {
+            "lat": "37.774900000000002",
+            "lon": "-122.4194",
+            "date": "2020-08-14T00:00:00",
+            "parameter": "O3",
+            "concentration": "30",
+            "unit": "µg\/m³",
+            "rawConcentration": "30",
+            "aqi": "42",
+            "category": "1",
+            "siteName": "n Francisco",
+            "siteAgency": "EPA",
+            "siteId": "06-075-0006"
+        }
+    ]
+}

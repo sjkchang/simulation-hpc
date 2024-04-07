@@ -18,6 +18,9 @@ private:
   std::vector<int> daysInMonth;
 
   void incrementHour() {
+    // Print the current date-time
+    std::cout << "Current date-time: " << currentDateTime << std::endl;
+
     // YYYYMMDD-HH
     int year = stoi(currentDateTime.substr(0, 4));
     int month = stoi(currentDateTime.substr(4, 2));
@@ -49,6 +52,7 @@ public:
   FileIterator(const std::string &baseDir, const std::string &startDate,
                const std::string &endDate)
       : baseDir(baseDir), currentDateTime(startDate), endDateTime(endDate) {
+
     int year = stoi(startDate.substr(0, 4));
     daysInMonth = {
         31, (year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)) ? 29 : 28,

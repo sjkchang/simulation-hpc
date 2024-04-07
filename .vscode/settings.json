@@ -72,6 +72,9 @@
         "variant": "cpp",
         "format": "cpp",
         "fstream": "cpp",
-        "codecvt": "cpp"
+        "codecvt": "cpp",
+        "strstream": "cpp",
+        "cfenv": "cpp",
+        "stdfloat": "cpp"
     }
 }
