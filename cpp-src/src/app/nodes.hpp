@@ -1,322 +1,174 @@
-// #include <mpi.h>
+#include "airnow/record.hpp"
 #include "loader.hpp"
-#include "mpi.h"
-#include <algorithm> // For std::sort
-#include <chrono>
-#include <cmath> // Include cmath for M_PI
-#include <filesystem>
+#include "omp.h"
+#include "results.hpp"
 #include <iostream>
-#include <sstream> // std::stringstream
 #include <string>
-#include <thread>
-#include <unistd.h>
 #include <vector>
 
-#define MASTER_RANK 0
-#define END_OF_WORK "END"
-
-const int TERMINATION_TAG = 999;
-
-// 1000 ms = 1 hour of simulation time
-const int stepSize = 100;
-
-enum Operation { AVGERAGE = 1, STATISTICS = 2 };
-
-class Node {
+class Worker {
 public:
-  int world_rank;
-  int world_size;
-  Node(int world_rank, int world_size)
-      : world_rank(world_rank), world_size(world_size) {}
-  virtual void run() = 0;
-  virtual ~Node() {}
-};
+  int rank;
+  int size;
+  std::string base_input_dir;
 
-enum Tags {
-  DATA_SIZE,
-  DATE_TAG,
-  STATS_TAG,
-};
+  std::vector<Record> records;
 
-struct Results {
-  int minAQI = 999;
-  int maxAQI = 0;
-  int aqiSum = 0;
-  int aqiCount = 0;
-  float averageAQI;
-
-  int minConcentration;
-  int maxConcentration;
-  int concentrationSum;
-  int concentrationCount;
-  float averageConcentration;
-
-  int numHealthAlerts;
-};
-
-class MasterNode : public Node {
-  std::string base_dir;
-  std::string start_date;
-  std::string end_date;
-
-  int numSent = 0;
-  int current_worker_rank = 1;
-
-  Loader loader;
-
-  std::map<std::string, Results> results;
-
-  int aqiSum = 0;
-  int aqiCount = 0;
-  int maxAQI = 0;
-
-public:
-  MasterNode(int world_size, std::string base_dir, std::string start_date,
-             std::string end_date)
-      : Node(0, world_size), base_dir(base_dir), start_date(start_date),
-        end_date(end_date) {}
+  Worker(int rank, int size) {
+    this->rank = rank;
+    this->size = size;
+  }
 
   void run() {
-    distributeData();
-    receiveData();
-    terminateWorkers();
+    while (true) {
+      // Receive the file name for the worker to process
+      std::string fileToProcess = recieveString();
 
-    runSimulation();
-  }
-
-  void runSimulation() {
-    int stepSize = 100;
-    // Loop through the results and print them
-    bool firstIteration = true;
-    for (auto [date, result] : results) {
-      aqiSum += result.aqiSum;
-      aqiCount += result.aqiCount;
-      if (result.maxAQI > maxAQI) {
-        maxAQI = result.maxAQI;
+      /// Remove the null terminator
+      if (!fileToProcess.empty() && fileToProcess.back() == '\0') {
+        fileToProcess.pop_back();
       }
 
-      if (result.aqiCount == 0) {
-        continue;
-      }
-      auto start_time = std::chrono::high_resolution_clock::now();
-
-      // Move currsor up to print the next result
-
-      std::cout << "Date: " << date << std::endl;
-      std::cout << "Running Max AQI: " << maxAQI << std::endl;
-      std::cout << "Running Average AQI: " << aqiSum / aqiCount << std::endl;
-      std::cout << "Daily Min AQI: " << result.minAQI << std::endl;
-      std::cout << "Daily Max AQI: " << result.maxAQI << std::endl;
-      std::cout << "Daily Average AQI: " << result.averageAQI << std::endl;
-      std::cout << "Daily Min Concentration: " << result.minConcentration
-                << std::endl;
-      std::cout << "Daily Max Concentration: " << result.maxConcentration
-                << std::endl;
-      std::cout << "Daily Average Concentration: "
-                << result.averageConcentration << std::endl;
-      std::cout << "Daily Number of Health Alerts: " << result.numHealthAlerts
-                << std::endl;
-
-      auto end_time = std::chrono::high_resolution_clock::now();
-      auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
-                          end_time - start_time)
-                          .count();
-
-      // Dont run if last iteration
-      if (date.compare("2020-09-24T23:00") == 0) {
-        continue;
-      }
-      std::cout << "\033[10A";
-
-      // Sleep for the remaining time
-      if (duration < stepSize) {
-        std::this_thread::sleep_for(
-            std::chrono::milliseconds(stepSize - duration));
-      }
-    }
-  }
-
-  void distributeData() {
-    std::vector<std::string> fileNames =
-        loader.getFileNames(base_dir, start_date, end_date);
-
-    for (int i = 1; i < world_size; ++i) {
-      if (current_worker_rank >= fileNames.size()) {
+      // Terminating condition
+      if (fileToProcess == "End of Work") {
+        std::cout << "Worker " << rank << " is terminating" << std::endl;
         break;
       }
 
-      std::string fileName = fileNames[current_worker_rank];
-      char start_file[16];
-      strcpy(start_file, fileName.c_str());
-      MPI_Send(&start_file, 16, MPI_CHAR, i, 0, MPI_COMM_WORLD);
+      // Load the file
+      std::vector<Record> records = Loader::loadFile(fileToProcess);
 
-      current_worker_rank++;
+      Results results;
+      results.date = records[0].date;
+
+      // Calculate the average AQI
+      AggregateStats aqi = calculateAQIStats(records);
+      AggregateStats con = calculateConcentrationStats(records);
+      std::map<std::string, RecordStats> parameter_stats =
+          calculateParameterStats(records);
+
+      results.aqi = aqi;
+      results.concentration = con;
+      results.parameter_stats = parameter_stats;
+
+      // Send the results back to the master
+      std::string resultsJson = results.toJson();
+      std::vector<unsigned char> buffer(resultsJson.begin(), resultsJson.end());
+      MPI_Send(buffer.data(), buffer.size(), MPI_UNSIGNED_CHAR, 0, 0,
+               MPI_COMM_WORLD);
     }
   }
 
+  // Receive the file name for the worker to process
   void receiveData() {
-    for (int i = 0; i < 500; ++i) {
-      // Receive the date
-      MPI_Status status;
-      char date[17];
-      MPI_Recv(&date, 17, MPI_CHAR, MPI_ANY_SOURCE, Tags::DATE_TAG,
-               MPI_COMM_WORLD, &status);
-
-      // Receive the data
-      int data[9];
-      MPI_Recv(&data, 9, MPI_INT, status.MPI_SOURCE, Tags::STATS_TAG,
-               MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-
-      Results result;
-      result.minAQI = data[0];
-      result.maxAQI = data[1];
-      result.aqiSum = data[2];
-      result.aqiCount = data[3];
-      result.averageAQI = data[2] / data[3];
-      result.minConcentration = data[4];
-      result.maxConcentration = data[5];
-      result.concentrationSum = data[6];
-      result.concentrationCount = data[7];
-      result.averageConcentration = data[6] / data[7];
-      result.numHealthAlerts = data[8];
-
-      results[date] = result;
-    }
+    std::cout << "Worker " << rank << " is receiving data" << std::endl;
   }
 
-  void terminateWorkers() {
-    for (int i = 1; i < world_size; ++i) {
-      int data = 0;
-      MPI_Send(&data, 1, MPI_INT, i, TERMINATION_TAG, MPI_COMM_WORLD);
+  AggregateStats calculateAQIStats(std::vector<Record> records) {
+    omp_set_num_threads(4);
+
+    int count = 0;
+    int sum = 0;
+    int max = INT_MIN;
+    int min = INT_MAX;
+
+#pragma omp parallel for reduction(+ : count, sum) reduction(max:max) reduction(min:min)
+    for (int i = 0; i < records.size(); i++) {
+      if (records[i].aqi != -999) {
+        count++;
+        sum += records[i].aqi;
+        max = std::max(max, records[i].aqi);
+        min = std::min(min, records[i].aqi);
+      }
     }
+
+    AggregateStats stats;
+
+    if (count == 0) {
+      stats.mean = 0;
+      stats.count = 0;
+      stats.sum = 0;
+      stats.max = 0;
+      stats.min = 0;
+      return stats;
+    }
+    stats.mean = sum / count;
+    stats.count = count;
+    stats.sum = sum;
+    stats.max = max;
+    stats.min = min;
+
+    return stats;
   }
-};
 
-std::vector<std::string> healthAlerts;
+  AggregateStats calculateConcentrationStats(std::vector<Record> records) {
+    omp_set_num_threads(4);
 
-class WorkerNode : public Node {
-private:
-  Loader loader;
-  std::string base_dir;
+    int count = 0;
+    int sum = 0;
+    int max = INT_MIN;
+    int min = INT_MAX;
 
-public:
-  WorkerNode(int world_rank, int world_size, std::string base_dir)
-      : Node(world_rank, world_size), base_dir(base_dir) {}
+#pragma omp parallel for reduction(+ : count, sum) reduction(max:max) reduction(min:min)
+    for (int i = 0; i < records.size(); i++) {
+      if (records[i].concentration != -999) {
+        count++;
+        sum += records[i].concentration;
+        max = std::max(max, records[i].concentration);
+        min = std::min(min, records[i].concentration);
+      }
+    }
+    AggregateStats stats;
 
-  void run() {
-    char start_file[16];
-    MPI_Recv(&start_file, 16, MPI_CHAR, 0, 0, MPI_COMM_WORLD,
+    if (count == 0) {
+      stats.mean = 0;
+      stats.count = 0;
+      stats.sum = 0;
+      stats.max = 0;
+      stats.min = 0;
+      return stats;
+    }
+
+    stats.mean = sum / count;
+    stats.count = count;
+    stats.sum = sum;
+    stats.max = max;
+    stats.min = min;
+
+    return stats;
+  };
+
+  std::map<std::string, RecordStats>
+  calculateParameterStats(std::vector<Record> records) {
+    std::map<std::string, std::vector<Record>> parameter_records;
+    // Add the records to the map
+    for (auto &record : records) {
+      parameter_records[record.parameter].push_back(record);
+    }
+
+    std::map<std::string, RecordStats> parameter_stats;
+    for (auto &pair : parameter_records) {
+      parameter_stats[pair.first].aqi = calculateAQIStats(pair.second);
+      parameter_stats[pair.first].concentration =
+          calculateConcentrationStats(pair.second);
+    }
+
+    return parameter_stats;
+  }
+
+  std::string recieveString() {
+    MPI_Status status;
+    MPI_Probe(0, 0, MPI_COMM_WORLD, &status);
+
+    int count;
+    MPI_Get_count(&status, MPI_UNSIGNED_CHAR, &count);
+
+    // Allocate buffer for the string + null terminator
+    std::vector<unsigned char> buffer(count + 1);
+    MPI_Recv(buffer.data(), count, MPI_UNSIGNED_CHAR, 0, 0, MPI_COMM_WORLD,
              MPI_STATUS_IGNORE);
+    buffer[count] = '\0'; // Null-terminate the string
 
-    char end_file[16];
-    MPI_Recv(&end_file, 16, MPI_CHAR, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-
-    loader.loadFiles(base_dir, "20200810-01", "20200810-23");
-    loader.loadFiles(base_dir, start_file, end_file);
-
-    calculateStats();
-    // generateHealthAlerts();
-  }
-
-  void generateHealthAlerts() {
-    for (auto [date, records] : loader.date_records) {
-
-      for (auto record : records) {
-        if (record->category > 4) {
-        }
-      }
-    }
-  }
-
-  double calculateDistance(double lat, double lon) {
-    // 39.765°N -122.673°E - Location of the complex fires
-    double lat1 = 39.765;
-    double lon1 = -122.673;
-
-    // Convert degrees to radians
-    double lat1Rad = lat1 * M_PI / 180.0;
-    double lon1Rad = lon1 * M_PI / 180.0;
-    double lat2Rad = lat * M_PI / 180.0;
-    double lon2Rad = lon * M_PI / 180.0;
-
-    // Calculate differences
-    double deltaLat = lat2Rad - lat1Rad;
-    double deltaLon = lon2Rad - lon1Rad;
-
-    // Calculate distance without considering Earth's curvature
-    // This is a simplification and not suitable for long distances
-    double distance = sqrt(deltaLat * deltaLat + deltaLon * deltaLon);
-
-    return distance;
-  }
-
-  void calculateStats(int distanceFilter = 0) {
-
-    for (auto [date, records] : loader.date_records) {
-      // Skip if date starts with 2020-08-10
-      if (date.compare(0, 10, "2020-08-10") == 0) {
-        continue;
-      }
-
-      int aqiSum = 0;
-      int aqiCount = 0;
-      int minAQI = 999;
-      int maxAQI = 0;
-      int concentrationSum = 0;
-      int concentrationCount = 0;
-      int minConcentration = 999;
-      int maxConcentration = 0;
-
-      int numHealthAlerts = 0;
-
-      for (auto record : records) {
-
-        if (distanceFilter > 0) {
-          double distance =
-              calculateDistance(record->latitude, record->longitude);
-
-          if (distance > distanceFilter) {
-            continue;
-          }
-        }
-
-        if (record->aqi != -999) {
-          aqiSum += record->aqi;
-          aqiCount++;
-          if (record->aqi < minAQI) {
-            minAQI = record->aqi;
-          }
-          if (record->aqi > maxAQI) {
-            maxAQI = record->aqi;
-          }
-        }
-        if (record->concentration != -999) {
-          concentrationSum += record->concentration;
-          concentrationCount++;
-          if (record->concentration < minConcentration) {
-            minConcentration = record->concentration;
-          }
-          if (record->concentration > maxConcentration) {
-            maxConcentration = record->concentration;
-          }
-        }
-
-        if (record->category > 4) {
-          numHealthAlerts++;
-        }
-      }
-      int data[9] = {minAQI,           maxAQI,
-                     aqiSum,           aqiCount,
-                     minConcentration, maxConcentration,
-                     concentrationSum, concentrationCount,
-                     numHealthAlerts};
-
-      char date_char[17];
-      strcpy(date_char, date.c_str());
-      MPI_Send(&date_char, 17, MPI_CHAR, 0, Tags::DATE_TAG, MPI_COMM_WORLD);
-
-      // Send the data
-      MPI_Send(&data, 9, MPI_INT, 0, Tags::STATS_TAG, MPI_COMM_WORLD);
-    }
+    return std::string(buffer.begin(), buffer.end());
   }
 };

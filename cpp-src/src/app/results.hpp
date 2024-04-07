@@ -6,27 +6,26 @@
 #include <string>
 #include <vector>
 
-struct Stats {
-  int minAQI;
-  int maxAQI;
-  int aqiSum;
-  int aqiCount;
+struct AggregateStats {
+  float mean;
+  float stdDev;
+  int min;
+  int max;
+  int count;
+  int sum;
+};
 
-  int minConcentration;
-  int maxConcentration;
-  int concentrationSum;
-  int concentrationCount;
+struct RecordStats {
+  AggregateStats aqi;
+  AggregateStats concentration;
 };
 
 class Results {
 public:
   std::string date;
-
-  // Statistics for all parameters
-  Stats compiledStatistics;
-  std::map<std::string, Stats> parameterStatistics;
-
-  std::vector<std::string> stationsWithHealthAlerts;
+  AggregateStats aqi;
+  AggregateStats concentration;
+  std::map<std::string, RecordStats> parameter_stats;
 
   std::string toJson() const {
     boost::property_tree::ptree pt;
@@ -35,42 +34,51 @@ public:
     pt.put("date", date);
 
     // Compiled statistics
-    boost::property_tree::ptree compiledStats;
-    compiledStats.put("minAQI", compiledStatistics.minAQI);
-    compiledStats.put("maxAQI", compiledStatistics.maxAQI);
-    compiledStats.put("aqiSum", compiledStatistics.aqiSum);
-    compiledStats.put("aqiCount", compiledStatistics.aqiCount);
-    compiledStats.put("minConcentration", compiledStatistics.minConcentration);
-    compiledStats.put("maxConcentration", compiledStatistics.maxConcentration);
-    compiledStats.put("concentrationSum", compiledStatistics.concentrationSum);
-    compiledStats.put("concentrationCount",
-                      compiledStatistics.concentrationCount);
-    pt.add_child("compiledStatistics", compiledStats);
+    boost::property_tree::ptree aqi_tree;
+    aqi_tree.put("mean", aqi.mean);
+    aqi_tree.put("stdDev", aqi.stdDev);
+    aqi_tree.put("min", aqi.min);
+    aqi_tree.put("max", aqi.max);
+    aqi_tree.put("count", aqi.count);
+    aqi_tree.put("sum", aqi.sum);
+    pt.add_child("aqi", aqi_tree);
+
+    boost::property_tree::ptree concentration_tree;
+    concentration_tree.put("mean", concentration.mean);
+    concentration_tree.put("stdDev", concentration.stdDev);
+    concentration_tree.put("min", concentration.min);
+    concentration_tree.put("max", concentration.max);
+    concentration_tree.put("count", concentration.count);
+    concentration_tree.put("sum", concentration.sum);
+    pt.add_child("concentration", concentration_tree);
 
     // Parameter statistics
-    boost::property_tree::ptree parameterStats;
-    for (const auto &[parameter, stats] : parameterStatistics) {
-      boost::property_tree::ptree pstats;
-      pstats.put("minAQI", stats.minAQI);
-      pstats.put("maxAQI", stats.maxAQI);
-      pstats.put("aqiSum", stats.aqiSum);
-      pstats.put("aqiCount", stats.aqiCount);
-      pstats.put("minConcentration", stats.minConcentration);
-      pstats.put("maxConcentration", stats.maxConcentration);
-      pstats.put("concentrationSum", stats.concentrationSum);
-      pstats.put("concentrationCount", stats.concentrationCount);
+    boost::property_tree::ptree parameter_stats_tree;
+    for (const auto &[parameter, stats] : parameter_stats) {
+      boost::property_tree::ptree parameter_tree;
 
-      parameterStats.add_child(parameter, pstats);
-    }
-    pt.add_child("parameters", parameterStats);
+      // AQI
+      boost::property_tree::ptree aqi_tree;
+      aqi_tree.put("mean", stats.aqi.mean);
+      aqi_tree.put("stdDev", stats.aqi.stdDev);
+      aqi_tree.put("min", stats.aqi.min);
+      aqi_tree.put("max", stats.aqi.max);
+      aqi_tree.put("count", stats.aqi.count);
+      aqi_tree.put("sum", stats.aqi.sum);
+      parameter_tree.add_child("aqi", aqi_tree);
 
-    // Stations with health alerts
-    boost::property_tree::ptree healthAlerts;
-    for (const auto &station : stationsWithHealthAlerts) {
-      healthAlerts.push_back(
-          std::make_pair("", boost::property_tree::ptree(station)));
+      // Concentration
+      boost::property_tree::ptree concentration_tree;
+      concentration_tree.put("mean", stats.concentration.mean);
+      concentration_tree.put("stdDev", stats.concentration.stdDev);
+      concentration_tree.put("min", stats.concentration.min);
+      concentration_tree.put("max", stats.concentration.max);
+      concentration_tree.put("count", stats.concentration.count);
+      concentration_tree.put("sum", stats.concentration.sum);
+      parameter_tree.add_child("concentration", concentration_tree);
+
+      parameter_stats_tree.add_child(parameter, parameter_tree);
     }
-    pt.add_child("stationsWithHealthAlerts", healthAlerts);
 
     // Write to string
     std::ostringstream oss;
