@@ -53,7 +53,7 @@ public:
     std::ifstream inputFile(filePath);
     if (!inputFile.is_open()) {
       std::cerr << "Error: Unable to open input CSV file." << std::endl;
-      return;
+      throw std::runtime_error("Error: Unable to open input CSV file.");
     }
 
     std::vector<Record> records;
@@ -85,6 +85,22 @@ public:
       lineNum++;
     }
     return records;
+  }
+
+  static std::map<std::string, std::vector<Record>>
+  loadFiles(const std::string &baseDir, const std::string &startDateTime,
+            const std::string &endDateTime) {
+    FileIterator fileIterator(baseDir, startDateTime, endDateTime);
+    std::vector<std::string> filePaths = fileIterator.getAllFilePaths();
+
+    std::map<std::string, std::vector<Record>> dateRecords;
+    for (const auto &filePath : filePaths) {
+      std::vector<Record> records = loadFile(filePath);
+      if (!records.empty()) {
+        dateRecords[records[0].date] = records;
+      }
+    }
+    return dateRecords;
   }
 };
 

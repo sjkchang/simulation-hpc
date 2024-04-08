@@ -1,1 +1,0 @@
-mpicxx -Wall -fpermissive -O3 -fopenmp -O3 -std=c++11 -g CMakeFiles/main.dir/app/main.cpp.o -o ../bin/main  ../lib/libbasic_socket.a -lpthread 

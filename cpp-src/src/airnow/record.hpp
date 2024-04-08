@@ -82,6 +82,63 @@ public:
     return record;
   }
 
+  static std::string
+  mapToJson(const std::map<std::string, std::vector<Record>> records) {
+    boost::property_tree::ptree pt;
+    for (const auto &[date, records] : records) {
+      boost::property_tree::ptree array_tree;
+      for (const auto &record : records) {
+        boost::property_tree::ptree record_tree;
+        record_tree.put("lat", record.latitude);
+        record_tree.put("lon", record.longitude);
+        record_tree.put("date", record.date);
+        record_tree.put("parameter", record.parameter);
+        record_tree.put("concentration", record.concentration);
+        record_tree.put("unit", record.unit);
+        record_tree.put("rawConcentration", record.rawConcentration);
+        record_tree.put("aqi", record.aqi);
+        record_tree.put("category", record.category);
+        record_tree.put("siteName", record.siteName);
+        record_tree.put("siteAgency", record.siteAgency);
+        record_tree.put("siteId", record.siteId);
+        array_tree.push_back(std::make_pair("", record_tree));
+      }
+      pt.add_child(date, array_tree);
+    }
+
+    std::ostringstream oss;
+    boost::property_tree::write_json(oss, pt, false);
+    return oss.str();
+  }
+
+  static std::map<std::string, std::vector<Record>>
+  mapFromJson(const std::string &json) {
+    std::istringstream is(json);
+    boost::property_tree::ptree pt;
+    boost::property_tree::read_json(is, pt);
+
+    std::map<std::string, std::vector<Record>> records;
+    for (const auto &record : pt) {
+      std::vector<Record> record_vector;
+      for (const auto &r : record.second) {
+        record_vector.emplace_back(
+            Record(r.second.get<double>("lat"), r.second.get<double>("lon"),
+                   r.second.get<std::string>("date"),
+                   r.second.get<std::string>("parameter"),
+                   r.second.get<int>("concentration"),
+                   r.second.get<std::string>("unit"),
+                   r.second.get<int>("rawConcentration"),
+                   r.second.get<int>("aqi"), r.second.get<int>("category"),
+                   r.second.get<std::string>("siteName"),
+                   r.second.get<std::string>("siteAgency"),
+                   r.second.get<std::string>("siteId")));
+      }
+      records[record.first] = record_vector;
+    }
+
+    return records;
+  }
+
   static std::string vectorToJson(const std::vector<Record> &records) {
     boost::property_tree::ptree pt;
     boost::property_tree::ptree array_tree;
@@ -101,35 +158,8 @@ public:
       record_tree.put("siteId", record.siteId);
       array_tree.push_back(std::make_pair("", record_tree));
     }
-    return "array_tree";
-  }
-
-  static std::string vectorToJson(const std::vector<Record *> &records) {
-    boost::property_tree::ptree pt;
-    boost::property_tree::ptree array_tree;
-    for (const auto &record : records) {
-      boost::property_tree::ptree record_tree;
-      record_tree.put("lat", record->latitude);
-      record_tree.put("lon", record->longitude);
-      record_tree.put("date", record->date);
-      record_tree.put("parameter", record->parameter);
-      record_tree.put("concentration", record->concentration);
-      record_tree.put("unit", record->unit);
-      record_tree.put("rawConcentration", record->rawConcentration);
-      record_tree.put("aqi", record->aqi);
-      record_tree.put("category", record->category);
-      record_tree.put("siteName", record->siteName);
-      record_tree.put("siteAgency", record->siteAgency);
-      record_tree.put("siteId", record->siteId);
-      array_tree.push_back(std::make_pair("", record_tree));
-    }
 
     pt.add_child("records", array_tree);
-
-    // Write to file
-    std::ofstream file("output.json");
-    boost::property_tree::write_json(file, pt);
-    file.close();
 
     std::ostringstream oss;
     boost::property_tree::write_json(oss, pt, false);

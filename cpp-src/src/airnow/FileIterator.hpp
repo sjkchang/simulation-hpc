@@ -18,15 +18,12 @@ private:
   std::vector<int> daysInMonth;
 
   void incrementHour() {
-    // Print the current date-time
-    std::cout << "Current date-time: " << currentDateTime << std::endl;
-
     // YYYYMMDD-HH
     int year = stoi(currentDateTime.substr(0, 4));
     int month = stoi(currentDateTime.substr(4, 2));
     int day = stoi(currentDateTime.substr(6, 2));
     // Skip the "-" character
-    int hour = stoi(currentDateTime.substr(9, 2));
+    unsigned int hour = stoi(currentDateTime.substr(9, 2));
 
     hour += 2;
     if (hour > 23) {
@@ -42,7 +39,7 @@ private:
       }
     }
 
-    char buffer[12]; // Increased size to accommodate the additional characters
+    char buffer[13]; // Increased size to accommodate the additional characters
     snprintf(buffer, sizeof(buffer), "%04d%02d%02d-%02d", year, month, day,
              hour);
     currentDateTime = std::string(buffer);

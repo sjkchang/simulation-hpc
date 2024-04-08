@@ -27,6 +27,8 @@ public:
   AggregateStats concentration;
   std::map<std::string, RecordStats> parameter_stats;
 
+  AggregateStats baseline_stats;
+
   std::string toJson() const {
     boost::property_tree::ptree pt;
 
@@ -51,6 +53,16 @@ public:
     concentration_tree.put("count", concentration.count);
     concentration_tree.put("sum", concentration.sum);
     pt.add_child("concentration", concentration_tree);
+
+    // Compiled statistics
+    boost::property_tree::ptree baseline_tree;
+    baseline_tree.put("mean", baseline_stats.mean);
+    baseline_tree.put("stdDev", baseline_stats.stdDev);
+    baseline_tree.put("min", baseline_stats.min);
+    baseline_tree.put("max", baseline_stats.max);
+    baseline_tree.put("count", baseline_stats.count);
+    baseline_tree.put("sum", baseline_stats.sum);
+    pt.add_child("baseline_aqi", baseline_tree);
 
     // Parameter statistics
     boost::property_tree::ptree parameter_stats_tree;

@@ -1,7 +1,6 @@
 import json
 import time
 from mpi4py import MPI
-import numpy as np
 import glob
 
 
@@ -15,11 +14,6 @@ def getFiles(directory_path):
     # Sort the list of files
     sorted_files = sorted(files)
     return sorted_files
-    
-def encode_string(str):
-    data_bytes = str.encode('utf-8')  # Encode string to bytes
-    data_np = np.frombuffer(data_bytes, dtype='B')  # 'B' for unsigned byte
-    return data_np
 
 def distribute_files(comm):
     # List all files in the data directory
@@ -27,7 +21,7 @@ def distribute_files(comm):
     
     current_worker = 1
     for file in files:
-        comm.Send([encode_string(file), MPI.CHAR], dest=current_worker, tag=0)  ####################### CONVERT TO NON-BLOCKING
+        comm.Send([file.encode('utf-8'), MPI.CHAR], dest=current_worker, tag=0)  ####################### CONVERT TO NON-BLOCKING
         current_worker += 1
         if current_worker == comm.Get_size():
             current_worker = 1
@@ -37,7 +31,7 @@ def distribute_files(comm):
 
     # Send End of Work signal to all workers
     for worker in range(1, comm.Get_size()):
-        comm.Send([encode_string("End of Work"), MPI.CHAR], dest=worker, tag=0)
+        comm.Send(["End of Work".encode('utf-8'), MPI.CHAR], dest=worker, tag=0)
 
     return len(files)
 
@@ -66,28 +60,55 @@ if rank == 0:
     # Receive the results from the workers
     while(numFilesSent > 0):
         received_str = recieve_string(comm)
-        print(received_str)
         numFilesSent -= 1
 
         results = json.loads(received_str)
         results_dict[results['date']] = results
-    
+
+  
+
+    # Calculate the average AQI and concentration for the entire dataset
+    cumulative_sum_aqi = 0
+    cumulative_count_aqi = 0
+    cumulative_sum_concentration = 0
+    cumulative_count_concentration = 0
+    cumulative_max_aqi = 0
+    cumulative_max_concentration = 0
+
     seconds_per_hour = 0.05
     # Print the results
     for key, results in sorted(results_dict.items()):
         # Measure time it takes to print the results
         start_time = time.time()
 
+        cumulative_sum_aqi += int(results["aqi"]["sum"])
+        cumulative_count_aqi += int(results["aqi"]["count"])
+        cumulative_max_aqi = max(cumulative_max_aqi, int(results["aqi"]["max"]))
+        cumulative_sum_concentration += int(results["concentration"]["sum"])
+        cumulative_count_concentration += int(results["concentration"]["count"])
+        cumulative_max_concentration = max(cumulative_max_concentration, int(results["concentration"]["max"]))
+
+        aqi_delta = float(results["aqi"]["mean"]) - float(results["baseline_aqi"]["mean"])
+
+        
         print("\033[2J\033[H", end="")
-        print("Date: ", key)
-        print("Cumulative AQI: ", results["aqi"]["mean"])
-        print("Cumulative Max AQI: ", results["aqi"]["max"])
-        print("Cumulative Min AQI: ", results["aqi"]["min"])
+        print("Current Time: ", key)
 
-        print("Cumulative Average Concentration: ",  results["concentration"]["mean"])
-        print("Cumulative Max Concentration: ", results["concentration"]["max"])
-        print("Cumulative Min Concentration: ", results["concentration"]["min"])
+        print("Current Statistics: ")
+        print("Avg. AQI: ", results["aqi"]["mean"])
+        print("Change from Baseline: ", aqi_delta)
+        print("Max AQI: ", results["aqi"]["max"])
+        print("Min AQI: ", results["aqi"]["min"])
+        print("Avg. Concentration: ",  results["concentration"]["mean"])
+        print("Max Concentration: ", results["concentration"]["max"])
+        print("Min Concentration: ", results["concentration"]["min"])
 
+        print()
+        print("Cumulative Statistics: ")
+        print("Avg. AQI: ", cumulative_sum_aqi / cumulative_count_aqi)
+        print("Max AQI: ", cumulative_max_aqi)
+        print("Avg. Concentration: ",  cumulative_sum_concentration / cumulative_count_concentration)
+        print("Max Concentration: ", cumulative_max_concentration)
 
 
         # Measure time it takes to print the results
@@ -95,6 +116,9 @@ if rank == 0:
         if(elapsed_time < seconds_per_hour):
             sleep_time = seconds_per_hour - elapsed_time
             time.sleep(sleep_time)
+   
+    
+    
     
 # Finalize the MPI environment
 MPI.Finalize()
